@@ -3,9 +3,15 @@
 
 #include <iostream>
 
+#include "Board.h"
+
 int main()
 {
-    std::cout << "Hello World!\n";
+    Board board;
+
+	while(true) {
+		board.gameInput();
+	}
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
