@@ -1,7 +1,7 @@
 #include "Queen.h"
 
 
-void Queen::updatePossibleCoordinates(BoardSquare board[8][8]) {
+void Queen::updatePossibleCoordinates(BoardSquare board[8][8], std::vector<Piece*> &allPieces) {
 	possibleCoordinates.clear();
 
 	// Move like BISHOP

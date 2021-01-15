@@ -1,6 +1,6 @@
 #include "King.h"
 
-void King::updatePossibleCoordinates(BoardSquare board[8][8]) {
+void King::updatePossibleCoordinates(BoardSquare board[8][8], std::vector<Piece*> &allPieces) {
 	possibleCoordinates.clear();
 
 	if (coordinate.x + 1 < 8) {

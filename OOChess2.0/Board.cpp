@@ -35,6 +35,7 @@ start:
 
 	char symbol = input[0];
 
+
 	if (input.size() == 2) {
 		if (input[0] == 'C') {
 			if (input[1] == 'K') {
@@ -67,8 +68,12 @@ start:
 		if (std::isalpha(input[0]) && std::isalpha(input[1]) && std::isalpha(input[3]) ) {
 			if (start.y >= 0 && start.y < 8 && destination.y >= 0 && destination.y < 8) {
 				if (!kingBecomesChecked(symbol, start, destination)) {
+					
 					if (movePiece(symbol, start, destination, false)) {
 						turn = turn == Owner::Blue ? Owner::Red : Owner::Blue;
+						clearBoard();
+						drawBoard();
+						
 					} else {
 						std::cout << std::endl << "The piece cannot move to that square" << std::endl;
 						goto start;
@@ -94,7 +99,56 @@ start:
 
 }
 
-int Board::findPiece(char symbol, int x, int y) {
+
+
+bool Board::movePiece(char symbol, Coordinate start, Coordinate destination, bool simulate) {
+	for (size_t i = 0; i < allPieces.size(); i++) {
+		if (allPieces[i]->owner == turn) {
+			if (allPieces[i]->symbol == symbol) {
+				if (allPieces[i]->coordinate.x == start.x && allPieces[i]->coordinate.y == start.y) {
+					for (size_t j = 0; j < allPieces[i]->possibleCoordinates.size(); j++) {
+						if (allPieces[i]->possibleCoordinates[j].x == destination.x
+							&& allPieces[i]->possibleCoordinates[j].y == destination.y) {
+
+
+							if (simulate == false) {
+								checkEnPassantPawns(turn);
+								tryCaptureEnpassant(symbol, start, destination);
+								deleteSquare(destination);
+								if (allPieces[i]->firstMove) {
+									allPieces[i]->firstMove = false;
+									allPieces[i]->justMadeFirstMove = true;
+								}
+							}
+							
+							allPieces[i]->formerCoordinate = start;
+							allPieces[i]->coordinate = destination;
+
+							if (simulate == false) {
+								clearBoard();
+							}
+							else {
+								syncAllPiecesToBoard();
+							}
+
+							updateAllPossibleCoordinates();
+
+							if (simulate == false) {
+								drawBoard();
+								clearEmptyPieces();
+							}
+							
+							return true;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return false;
+}
+int Board::findPieceIndex(char symbol, int x, int y) {
 	for (size_t i = 0; i < allPieces.size(); i++) {
 		if (allPieces[i]->symbol == symbol) {
 			if (allPieces[i]->coordinate.x == x && allPieces[i]->coordinate.y == y) {
@@ -103,9 +157,8 @@ int Board::findPiece(char symbol, int x, int y) {
 		}
 	}
 
-	return 100;
+	return -1;
 }
-
 int Board::kingIsUnderCheck(Owner owner) {
 	Piece* king = allPieces[getKingIndex(owner)];
 	
@@ -121,8 +174,6 @@ int Board::kingIsUnderCheck(Owner owner) {
 
 	return false;
 }
-
-
 bool Board::castle(Owner owner, bool kingSide) {
 	Piece* king = allPieces[getKingIndex(owner)];
 	if (king->firstMove && kingIsUnderCheck(owner) == false) {
@@ -131,8 +182,8 @@ bool Board::castle(Owner owner, bool kingSide) {
 		int row = owner == Owner::Blue ? 0 : 7;
 		int column = kingSide == true ? 7 : 0;
 		
-		int rookIndex = findPiece('R', column, row);
-		if (rookIndex == 100) return false;
+		int rookIndex = findPieceIndex('R', column, row);
+		if (rookIndex == -1) return false;
 		Piece* rook = allPieces[rookIndex];
 
 		if (!rook->firstMove) return false;
@@ -165,15 +216,13 @@ bool Board::castle(Owner owner, bool kingSide) {
 				if (board[kingStartCoordinate.y][kingStartCoordinate.x - i].owner == Owner::None) {
 					if (kingBecomesChecked('K', king->coordinate, Coordinate(kingStartCoordinate.x - i, kingStartCoordinate.y))) {
 						king->coordinate = kingStartCoordinate;
-						king->updatePossibleCoordinates(board);
-						std::cout << "3";
+						king->updatePossibleCoordinates(board, allPieces);
 						return false;
 					}
 				}
 				else {
 					king->coordinate = kingStartCoordinate;
-					king->updatePossibleCoordinates(board);
-					std::cout << "4";
+					king->updatePossibleCoordinates(board, allPieces);
 					return false;
 				}
 			}
@@ -190,15 +239,34 @@ bool Board::castle(Owner owner, bool kingSide) {
 	return false;
 }
 
-
-void Board::captureSquare(Coordinate destination) {
-	for (size_t i = 0; i < allPieces.size(); i++) {
-		if (allPieces[i]->coordinate.x == destination.x && allPieces[i]->coordinate.y == destination.y) {
-			allPieces.erase(allPieces.begin() + i);
-			break;
+void Board::tryCaptureEnpassant(char symbol, Coordinate start, Coordinate destination) {
+	if (symbol != 'P') return;
+	if (start.x == destination.x) return;
+	
+	if (board[destination.y][destination.x].owner == Owner::None) {
+		if (turn == Owner::Blue) {
+			deleteSquare(Coordinate(destination.x, destination.y-1));
+		} else {
+			deleteSquare(Coordinate(destination.x, destination.y + 1));
 		}
 	}
+	
 }
+
+
+bool Board::deleteSquare(Coordinate destination) {
+	for (size_t i = 0; i < allPieces.size(); i++) {
+		if (allPieces[i]->coordinate.x == destination.x && allPieces[i]->coordinate.y == destination.y) {
+			allPieces[i]->symbol = ' ';
+			allPieces[i]->owner = Owner::None;
+			allPieces[i]->possibleCoordinates.clear();
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool Board::kingBecomesChecked(char symbol, Coordinate start, Coordinate destination) {	
 	if (movePiece(symbol, start, destination, true)) {
 		for (size_t i = 0; i < allPieces.size(); i++ ) {
@@ -221,7 +289,10 @@ bool Board::kingBecomesChecked(char symbol, Coordinate start, Coordinate destina
 }
 void Board::moveBack(char symbol, Coordinate coordinate) {
 	for (size_t i = 0; i < allPieces.size(); i++) {
-		if (allPieces[i]->symbol == symbol && allPieces[i]->coordinate.x == coordinate.x && allPieces[i]->coordinate.y == coordinate.y) {
+		if (allPieces[i]->symbol == symbol 
+			&& allPieces[i]->coordinate.x == coordinate.x 
+			&& allPieces[i]->coordinate.y == coordinate.y
+			&& allPieces[i]->owner == turn) {
 			allPieces[i]->coordinate = allPieces[i]->formerCoordinate;
 			syncAllPiecesToBoard();
 			updateAllPossibleCoordinates();
@@ -237,50 +308,33 @@ int Board::getKingIndex(Owner owner) {
 
 	return ERROR;
 }
-bool Board::movePiece(char symbol, Coordinate start, Coordinate destination, bool simulate) {	
+
+void Board::clearEmptyPieces() {
 	for (size_t i = 0; i < allPieces.size(); i++) {
-		if (allPieces[i]->owner == turn) {
-			if (allPieces[i]->symbol == symbol) {
-				if (allPieces[i]->coordinate.x == start.x && allPieces[i]->coordinate.y == start.y) {
-					for (size_t j = 0; j < allPieces[i]->possibleCoordinates.size(); j++) {
-						if (allPieces[i]->possibleCoordinates[j].x == destination.x 
-							&& allPieces[i]->possibleCoordinates[j].y == destination.y) {
-
-							if (simulate == false) {
-								captureSquare(destination);
-								if (allPieces[i]->firstMove) allPieces[i]->firstMove = false;
-							}
-
-							allPieces[i]->formerCoordinate = start;
-							allPieces[i]->coordinate = destination;
-							if (simulate == false ) {
-								clearBoard();
-							} else {
-								syncAllPiecesToBoard();
-							}
-							
-							updateAllPossibleCoordinates();
-							
-							if (simulate == false) {
-								drawBoard();
-							}
-							
-							return true;
-						}
-					}
-				}
-			}
+		if (allPieces[i]->symbol == ' ' && allPieces[i]->owner == Owner::None) {
+			allPieces.erase(allPieces.begin() + i);
 		}
 	}
-
-	return false;
 }
+
 
 void Board::updateAllPossibleCoordinates() {
 	for (size_t i = 0; i < allPieces.size(); i++) {
-		allPieces[i]->updatePossibleCoordinates(board);
+		allPieces[i]->updatePossibleCoordinates(board, allPieces);
 	}
 }
+
+void Board::checkEnPassantPawns(Owner owner) {
+	for (size_t i = 0; i < allPieces.size(); i++) {
+		if (allPieces[i]->symbol == 'P' && allPieces[i]->owner == owner) {
+			if (allPieces[i]->justMadeFirstMove) {
+				allPieces[i]->justMadeFirstMove = false;
+			}
+		}
+	} 
+}
+
+
 void Board::drawBoard() {
 	bool lightSquare = true;
 	for (int i = 7; i >= 0; i--) {
@@ -330,6 +384,7 @@ void Board::clearBoard() {
 }
 
 void Board::syncAllPiecesToBoard() {
+	std::cout << "syncing...";
 	for (int i = 7; i >= 0; i--) {
 		for (int j = 0; j < 8; j++) {
 			board[i][j] = BoardSquare(' ', Owner::None);
@@ -345,10 +400,10 @@ void Board::resetBoardPieces() {
 	allPieces.clear();
 
 	// Spawning Pawns
-	//for (int i = 0; i < 8; i++) {
-	//	allPieces.emplace_back(new Pawn(Coordinate(i, 1), Owner::Blue, 'P'));
-	//	allPieces.emplace_back(new Pawn(Coordinate(i, 6), Owner::Red, 'P'));
-	//}
+	for (int i = 0; i < 8; i++) {
+		allPieces.emplace_back(new Pawn(Coordinate(i, 1), Owner::Blue, 'P'));
+		allPieces.emplace_back(new Pawn(Coordinate(i, 6), Owner::Red, 'P'));
+	}
 
 	// Spawning Rooks
 	allPieces.emplace_back(new Rook(Coordinate(0, 0), Owner::Blue, 'R'));
@@ -357,20 +412,20 @@ void Board::resetBoardPieces() {
 	allPieces.emplace_back(new Rook(Coordinate(7, 7), Owner::Red, 'R'));
 
 	//// Spawning Knights
-	//allPieces.emplace_back(new Knight(Coordinate(1, 0), Owner::Blue, 'N'));
-	//allPieces.emplace_back(new Knight(Coordinate(6, 0), Owner::Blue, 'N'));
-	//allPieces.emplace_back(new Knight(Coordinate(1, 7), Owner::Red, 'N'));
-	//allPieces.emplace_back(new Knight(Coordinate(6, 7), Owner::Red, 'N'));
+	allPieces.emplace_back(new Knight(Coordinate(1, 0), Owner::Blue, 'N'));
+	allPieces.emplace_back(new Knight(Coordinate(6, 0), Owner::Blue, 'N'));
+	allPieces.emplace_back(new Knight(Coordinate(1, 7), Owner::Red, 'N'));
+	allPieces.emplace_back(new Knight(Coordinate(6, 7), Owner::Red, 'N'));
 
 	// Spawning Bishops
-	//allPieces.emplace_back(new Bishop(Coordinate(2, 0), Owner::Blue, 'B'));
-	//allPieces.emplace_back(new Bishop(Coordinate(5, 0), Owner::Blue, 'B'));
-	//allPieces.emplace_back(new Bishop(Coordinate(2, 7), Owner::Red, 'B'));
-	//allPieces.emplace_back(new Bishop(Coordinate(5, 7), Owner::Red, 'B'));
+	allPieces.emplace_back(new Bishop(Coordinate(2, 0), Owner::Blue, 'B'));
+	allPieces.emplace_back(new Bishop(Coordinate(5, 0), Owner::Blue, 'B'));
+	allPieces.emplace_back(new Bishop(Coordinate(2, 7), Owner::Red, 'B'));
+	allPieces.emplace_back(new Bishop(Coordinate(5, 7), Owner::Red, 'B'));
 
 	//// Spawning Queens
-	//allPieces.emplace_back(new Queen(Coordinate(3, 0), Owner::Blue, 'Q'));
-	//allPieces.emplace_back(new Queen(Coordinate(3, 7), Owner::Red, 'Q'));
+	allPieces.emplace_back(new Queen(Coordinate(3, 0), Owner::Blue, 'Q'));
+	allPieces.emplace_back(new Queen(Coordinate(3, 7), Owner::Red, 'Q'));
 
 	//// Spawning Kings
 	allPieces.emplace_back(new King(Coordinate(4, 0), Owner::Blue, 'K'));

@@ -1,6 +1,6 @@
 #include "Rook.h"
 
-void Rook::updatePossibleCoordinates(BoardSquare board[8][8]) {
+void Rook::updatePossibleCoordinates(BoardSquare board[8][8], std::vector<Piece*> &allPieces) {
 	possibleCoordinates.clear();
 
 	for (int i = 1; coordinate.y + i < 8; i++) {

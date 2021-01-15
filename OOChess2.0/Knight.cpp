@@ -1,6 +1,6 @@
 #include "Knight.h"
 
-void Knight::updatePossibleCoordinates(BoardSquare board[8][8]) {
+void Knight::updatePossibleCoordinates(BoardSquare board[8][8], std::vector<Piece*> &allPieces) {
 	possibleCoordinates.clear();
 
 	if (coordinate.y + 2 < 8) {
